@@ -16,14 +16,14 @@ _MAX_CHARS = 4000
 
 def _parse_pdf(path: str) -> dict[str, Any]:
     try:
-        import PyPDF2
+        from pypdf import PdfReader
 
         with open(path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
+            reader = PdfReader(f)
             text = "".join((page.extract_text() or "") for page in reader.pages)
         return {"status": "success", "file_type": "pdf", "pages": len(reader.pages), "text": text[:_MAX_CHARS]}
     except ImportError:
-        return {"status": "error", "message": "PyPDF2 미설치 (pip install PyPDF2)", "text": ""}
+        return {"status": "error", "message": "pypdf 미설치 (pip install pypdf)", "text": ""}
     except Exception as e:  # noqa: BLE001
         return {"status": "error", "message": f"PDF 파싱 실패: {e}", "text": ""}
 

@@ -3,9 +3,6 @@
 자연어 요청을 받아 **청년 정책·컨텐츠를 검색·추천**하고, 멀티턴 대화 맥락과 장기기억을 반영해 답변하는 Agent 서비스입니다.
 전체 실행 흐름은 **LangGraph `StateGraph`** 로 설계했으며, 조건부 분기와 재시도 루프, RAG, 메모리, 미들웨어, 구조화 출력(OutputParser)을 포함합니다.
 
-> 제출 본체: **`agent3`** (LangGraph StateGraph 구현, 단독 실행)
-> `agent3`는 스태지/RAG/LLM/메모리/매핑 모듈과 데이터(벡터스토어)를 모두 자체 포함하며, 다른 폴더 의존 없이 독립 실행됩니다.
-
 ---
 
 ## 1. 서비스 소개 및 사용 시나리오
@@ -175,6 +172,8 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
+- 실행에 필요한 파이썬 패키지는 루트의 `requirements.txt` 기준으로 설치합니다. (`requsest.txt`가 아니라 `requirements.txt`)
+
 ### 2) 환경변수 (.env)
 루트에 `.env` 생성 후 키 입력 (하드코딩 금지):
 ```
@@ -193,6 +192,12 @@ python -m agent3.run_server
 - API Docs: `http://localhost:8002/docs`
 - 동작 보고서(다이어그램): `http://localhost:8002/static/agent3_report.html`
   - 채팅 화면 우상단 **📊 보고서** 버튼으로도 이동 가능
+  - 실제 사용 방법은 보고서의 **## 7) 상세 사용 가이드**를 보고 사용해 주세요.
+
+### 4) 의존성 점검 결과
+- `pip install -r requirements.txt` 후 핵심 엔트리포인트(`agent3.api.app`, `agent3.graph.build_graph`) 임포트/컴파일 확인 완료
+- 스모크 테스트(`python -m agent3._smoke_test`) 실행 확인
+- 이미지 OCR 기능은 파이썬 패키지(`pytesseract`) 외에 시스템에 Tesseract OCR 실행 파일이 설치되어 있어야 동작합니다.
 
 ---
 
@@ -242,6 +247,7 @@ requirements.txt
 - 장기기억 요약이 현재 규칙 기반이라 LLM 요약 대비 품질이 제한적입니다.
 - RAG 정량 평가셋(Precision@K 등)이 아직 문서화되지 않았습니다.
 - 웹 검색은 키(TAVILY) 설정 시에만 동작합니다.
+- 데이터(정책/컨텐츠 원천 및 벡터 인덱스)가 동적으로 변경될 때 이를 자동 감지해 재색인/동기화하는 장치가 없어, 인덱스 재빌드 전까지 최신 데이터 반영이 지연될 수 있습니다.
 
 ### 개선 방향
 1. 장기기억 요약을 LLM 기반으로 교체
