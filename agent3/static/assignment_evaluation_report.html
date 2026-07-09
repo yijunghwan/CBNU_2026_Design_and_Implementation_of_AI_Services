@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LangChain Agent 평가 보고서</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default' });
+  </script>
+  <style>
+    :root {
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --ink: #1d2433;
+      --muted: #5f6b84;
+      --line: #dbe1ee;
+      --primary: #0057b8;
+      --accent: #0b8f6a;
+      --warn: #b26a00;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 10% 0%, #e8f2ff 0, transparent 45%),
+        radial-gradient(circle at 90% 10%, #e7fff5 0, transparent 35%),
+        var(--bg);
+      color: var(--ink);
+      font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+      line-height: 1.6;
+    }
+    .wrap {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 28px 18px 64px;
+    }
+    .hero {
+      background: linear-gradient(140deg, #0f2f5f, #0057b8 45%, #0b8f6a);
+      color: #fff;
+      border-radius: 18px;
+      padding: 26px 24px;
+      box-shadow: 0 10px 30px rgba(4, 35, 80, 0.2);
+      margin-bottom: 18px;
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 {
+      margin: 0 0 10px;
+      font-size: 21px;
+      border-bottom: 2px solid var(--line);
+      padding-bottom: 6px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      margin-top: 14px;
+      box-shadow: 0 5px 16px rgba(24, 46, 84, 0.06);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .ok { background: var(--accent); }
+    .warn { background: var(--warn); }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px 9px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f3f6fc; }
+    code {
+      background: #edf2ff;
+      padding: 2px 6px;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+    .small { color: var(--muted); font-size: 13px; }
+    .pill {
+      display: inline-block;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 10px;
+      margin: 4px 6px 0 0;
+      font-size: 13px;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>청년정책 Agent 동작 보고서</h1>
+      <div>실행 흐름, LLM 개입 지점, 미들웨어, Tool 오케스트레이션, 사용법 중심 문서</div>
+      <div class="small" style="color:#dce8ff; margin-top:8px;">이 페이지 하나로 입력부터 최종 응답까지 내부 동작과 사용자 사용법을 모두 파악할 수 있습니다.</div>
+    </section>
+
+    <section class="card">
+      <h2>1) 프로젝트 요약</h2>
+      <div class="grid">
+        <div>
+          <b>핵심 목적</b><br/>
+          자연어 기반 청년정책 추천/탐색 Agent 구현
+        </div>
+        <div>
+          <b>핵심 기술</b><br/>
+          FastAPI, LangChain, ChromaDB, SQLite, SSE
+        </div>
+        <div>
+          <b>실행 트랙</b><br/>
+          <span class="pill">src (LangGraph 기반)</span>
+          <span class="pill">agent2 (강화 파이프라인)</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) 워크플로우 다이어그램</h2>
+      <div class="mermaid">
+flowchart TD
+    A[사용자 입력] --> B[Security 검사]
+    B -->|차단| X[종료 응답]
+    B -->|통과| C[Context Load]
+    C --> D[Planner LLM]
+    D --> E{메모리 명령인가?}
+    E -->|Yes| F[Memory FSM 처리]
+    F --> X
+    E -->|No| G[Slot 정규화]
+    G --> H[Tool 실행]
+    H --> I[Responder LLM]
+    I --> J[Judge LLM]
+    J -->|retry 1회| H
+    J -->|accept/clarify| X
+
+    H --> P[(Policy RAG)]
+    H --> Q[(Content RAG)]
+    H --> R[Web Search]
+    H --> S[File Parse]
+      </div>
+      <div class="small">요구사항 대응: 조건부 분기(E), 반복 루프(J→H), 멀티 Tool(H)</div>
+    </section>
+
+    <section class="card">
+      <h2>3) 액티비티 다이어그램</h2>
+      <div class="mermaid">
+    flowchart TD
+        S[Start] --> IN[Input Query Or File]
+        IN --> VAL[Validate Input]
+        VAL -->|Blocked| ERR[Return Error]
+        ERR --> E[End]
+        VAL -->|Pass| PLAN[Infer Intent And Slots]
+        PLAN --> NEED{Need Tools?}
+        NEED -->|No| DIRECT[Generate Direct Answer]
+        NEED -->|Yes| TOOL[Select And Run Tools]
+        TOOL --> DRAFT[Compose Draft Answer]
+        DRAFT --> DECIDE{Judge Decision}
+        DECIDE -->|Retry| TOOL
+        DECIDE -->|Accept Or Clarify| FINAL[Return Final Answer]
+        DIRECT --> FINAL
+        FINAL --> SAVE[Persist Memory]
+        SAVE --> E
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) 전체 실행 다이어그램 (입력 → 응답)</h2>
+      <div class="mermaid">
+    flowchart TD
+        U[User Input] --> MW[Middleware Check]
+        MW --> MWQ{Sensitive Or Too Long}
+        MWQ -->|Yes| BLOCK[Blocked Response]
+        BLOCK --> OUT[Final Response]
+        MWQ -->|No| CL[Context Load]
+
+        CL --> SW[Short Memory Window]
+        CL --> LMQ{Long Memory Enabled}
+        LMQ -->|Yes| LW[Load Profile Summary Recent]
+        LMQ -->|No| PLAN
+        LW --> PLAN
+
+        PLAN[Planner LLM Intent Analysis] --> MEMQ{Memory Command}
+        MEMQ -->|Yes| MEMFSM[Memory FSM Middleware]
+        MEMFSM --> CONFQ{Confirm Or Cancel}
+        CONFQ -->|Confirm| MEMDO[Enable Disable Update Delete]
+        CONFQ -->|Cancel| MEMSTOP[Cancel Memory Action]
+        MEMDO --> OUT
+        MEMSTOP --> OUT
+
+        MEMQ -->|No| SLOT[Normalize Slots]
+        SLOT --> PSEL[Plan With Selected Model]
+        PSEL --> TOOLS[Tool Orchestration]
+
+        TOOLS --> TP[rag_policy_search]
+        TOOLS --> TC[rag_content_search]
+        TOOLS --> TW[web_search]
+        TOOLS --> TF[file_parse]
+        TOOLS --> TM[Multi Tool Composition]
+
+        TP --> RESP
+        TC --> RESP
+        TW --> RESP
+        TF --> RESP
+        TM --> RESP
+
+        RESP[Responder With Selected Model] --> JUDGE[Judge LLM]
+        JUDGE --> RETRYQ{Need Retry}
+        RETRYQ -->|Yes Max One| TOOLS
+        RETRYQ -->|No| FINAL[Finalize Answer]
+
+        FINAL --> SAVE[Save Memory]
+        SAVE --> SAVEQ{Long Memory Enabled}
+        SAVEQ -->|Yes| SAVEBOTH[Save Session And Long DB]
+        SAVEQ -->|No| SAVESESSION[Save Session Only]
+        SAVEBOTH --> OUT
+        SAVESESSION --> OUT
+      </div>
+      <div class="small">핵심: 미들웨어 검사 → Planner LLM 의도분석 → 선택 모델 기반 계획/응답 생성 → Tool 오케스트레이션 → Judge 루프 → 메모리 저장</div>
+    </section>
+
+    <section class="card">
+      <h2>5) 상세 사용 가이드</h2>
+      <h3>기본 사용 순서</h3>
+      <ol>
+        <li>서버 실행: <code>python -m agent2.run_server</code></li>
+        <li>브라우저 접속: <code>http://localhost:8001</code></li>
+        <li>상단에서 모델 선택 후 질문 입력</li>
+        <li>필요 시 파일 첨부 후 파일 기반 질문 수행</li>
+        <li>우측 패널에서 계획, 슬롯, Tool 실행, 메모리 상태를 확인</li>
+      </ol>
+
+      <h3>장기기억 사용법</h3>
+      <ol>
+        <li>유저코드를 입력합니다. (예: <code>user_kim_01</code>)</li>
+        <li>"장기기억 켜줘" 또는 "내 프로필 저장할게"처럼 명령합니다.</li>
+        <li>시스템이 동의/확인을 요청하면 "동의" 또는 "확인"으로 확정합니다.</li>
+        <li>이후 나이, 지역, 소득, 결혼여부, 관심분야 등을 자연어로 알려 프로필을 업데이트합니다.</li>
+        <li>"내 저장 프로필 보여줘"로 저장 상태를 조회합니다.</li>
+      </ol>
+
+      <h3>유저코드 사용 규칙</h3>
+      <ul>
+        <li>유저코드는 장기기억 식별자입니다. 같은 유저코드를 쓰면 같은 프로필/이력이 연결됩니다.</li>
+        <li>다른 유저코드를 쓰면 독립된 메모리 공간으로 동작합니다.</li>
+        <li>테스트와 실사용을 분리하려면 유저코드를 구분해서 사용하세요.</li>
+      </ul>
+
+      <h3>모델 선택 가이드</h3>
+      <ul>
+        <li>정확한 구조화/추론 중심: 고성능 모델 선택</li>
+        <li>빠른 응답/저비용 중심: 경량 모델 선택</li>
+        <li>선택한 모델은 Planner, Responder, Judge 단계에 반영되어 실행됩니다.</li>
+      </ul>
+
+      <h3>질문 방식과 추천 방향</h3>
+      <ul>
+        <li>좋은 질문 예시: "서울 거주, 27세, 미혼, 중위소득 100%, 취업 분야 정책 추천"</li>
+        <li>컨텐츠 중심 예시: "청년 대상 모집 공고나 최신 소식 알려줘"</li>
+        <li>최신성 강화 예시: "최근 마감 임박 정책 위주로 알려줘"</li>
+        <li>파일 기반 예시: 파일 업로드 후 "이 파일 조건에 맞는 정책만 추천해줘"</li>
+      </ul>
+      <div class="small">보고서 페이지 URL: <code>/static/assignment_evaluation_report.html</code></div>
+    </section>
+
+    <section class="card">
+      <h2>6) 내부 동작 상세</h2>
+      <div><span class="badge ok">Tool</span> rag_policy_search, rag_content_search, web_search, file_parse</div>
+      <div><span class="badge ok">RAG</span> 정책/컨텐츠 분리 벡터스토어 + 재랭킹</div>
+      <div><span class="badge ok">Memory</span> 단기(SessionStore) + 장기(SQLite LongTermStore)</div>
+      <div><span class="badge warn">Judge Loop</span> 최대 1회 재시도로 무한 루프 방지</div>
+      <div><span class="badge ok">Middleware 성격</span> 보안 필터/입력 길이 제한/예외 반환/메모리 확인 절차</div>
+    </section>
+
+    <section class="card">
+      <h2>7) 제출 시 강조 포인트</h2>
+      <ul>
+        <li>입력부터 응답까지 LLM 개입 지점(Planner/Responder/Judge)을 단계별로 설명하세요.</li>
+        <li>미들웨어가 단순 로깅이 아닌 안전장치(민감정보/확인절차)로 작동함을 보여주세요.</li>
+        <li>Tool 오케스트레이션으로 단일/복수 Tool 실행이 가능한 흐름을 시연하세요.</li>
+        <li>유저코드 기반 장기기억 재사용 시나리오를 라이브 데모로 보여주세요.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

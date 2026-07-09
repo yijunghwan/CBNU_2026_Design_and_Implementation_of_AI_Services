@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>청년정책 Agent v3 - LangGraph 보고서</title>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  </script>
+  <style>
+    :root {
+      --bg: #f5f7fb; --card: #ffffff; --ink: #1a2233; --muted: #5f6b84;
+      --line: #dde3ef; --primary: #4338ca; --accent: #0d9488; --warn: #b45309;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; color: var(--ink); line-height: 1.65;
+      font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+      background:
+        radial-gradient(circle at 8% 0%, #eef0ff 0, transparent 42%),
+        radial-gradient(circle at 92% 8%, #e6fffb 0, transparent 34%),
+        var(--bg);
+    }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 26px 18px 72px; }
+    .hero {
+      background: linear-gradient(135deg, #312e81, #4338ca 48%, #0d9488);
+      color: #fff; border-radius: 18px; padding: 26px 24px;
+      box-shadow: 0 12px 32px rgba(30, 27, 90, 0.22); margin-bottom: 16px;
+    }
+    h1 { margin: 0 0 8px; font-size: 27px; }
+    h2 { margin: 0 0 10px; font-size: 20px; border-bottom: 2px solid var(--line); padding-bottom: 6px; }
+    h3 { margin: 14px 0 6px; font-size: 16px; color: var(--primary); }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      padding: 18px; margin-top: 14px; box-shadow: 0 5px 16px rgba(24, 46, 84, 0.06);
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .pill { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; margin: 4px 6px 0 0; font-size: 13px; background: #fff; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; margin-right: 6px; }
+    .ok { background: var(--accent); } .warn { background: var(--warn); } .llm { background: var(--primary); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid var(--line); padding: 8px 9px; text-align: left; vertical-align: top; }
+    th { background: #f1f3fb; }
+    code { background: #eef0ff; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
+    .small { color: var(--muted); font-size: 13px; }
+    .mermaid { overflow-x: auto; }
+    .step { display:flex; gap:10px; margin:8px 0; }
+    .num { flex:0 0 26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
+    a.back { color:#c7d2fe; text-decoration:none; font-size:13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>청년정책 Agent v3 · LangGraph 동작 보고서</h1>
+      <div>입력 → 미들웨어 → LLM 의도분석 → 계획 → Tool 오케스트레이션 → 응답생성 → LLM 평가 루프 → 응답</div>
+      <div class="small" style="color:#dbe4ff; margin-top:8px;">
+        <b>LangGraph StateGraph</b> 기반으로 오케스트레이션한 청년정책 Agent입니다.
+        <a class="back" href="/">← 채팅으로 돌아가기</a>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>1) 한눈에 보기</h2>
+      <div class="grid">
+        <div><b>핵심 목적</b><br/>자연어 기반 청년정책 추천·탐색 Agent</div>
+        <div><b>오케스트레이션</b><br/>LangGraph StateGraph (조건부 분기 + 재시도 루프)</div>
+        <div><b>LLM 개입 지점</b><br/>Planner · Responder · Judge (3곳)</div>
+        <div><b>공유 상태</b><br/>PipelineContext 하나를 전 구간 공유</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2) 전체 실행 다이어그램 (입력 → 응답)</h2>
+      <div class="mermaid">
+flowchart TD
+    U[User Input] --> MW[Middleware Security Check]
+    MW --> MWQ{Sensitive Or Too Long}
+    MWQ -->|Yes| FB[finalize_blocked]
+    FB --> OUT[Final Response]
+    MWQ -->|No| CL[context_load]
+
+    CL --> SW[Short Memory Window]
+    CL --> LMQ{Long Memory Enabled}
+    LMQ -->|Yes| LW[Load Profile Summary Recent]
+    LMQ -->|No| PLAN
+    LW --> PLAN
+
+    PLAN[planner LLM Intent] --> MEMQ{Memory Command}
+    MEMQ -->|Yes| MEM[memory FSM Middleware]
+    MEM --> CONFQ{Confirm Or Cancel}
+    CONFQ -->|Confirm| FM[finalize_memory]
+    CONFQ -->|Cancel| FM
+    FM --> OUT
+
+    MEMQ -->|No| SLOT[slots Normalize]
+    SLOT --> PSEL[Plan With Selected Model]
+    PSEL --> TOOLS[tools Orchestration]
+
+    TOOLS --> TP[rag_policy_search]
+    TOOLS --> TC[rag_content_search]
+    TOOLS --> TW[web_search]
+    TOOLS --> TF[file_parse]
+    TOOLS --> TMULTI[Multi Tool Composition]
+
+    TP --> RESP[responder Selected Model]
+    TC --> RESP
+    TW --> RESP
+    TF --> RESP
+    TMULTI --> RESP
+
+    RESP --> JUDGE[judge LLM Evaluate]
+    JUDGE --> RQ{Need Retry}
+    RQ -->|Yes Max One| RP[retry_prep]
+    RP --> TOOLS
+    RQ -->|No| FA[finalize_answer]
+
+    FA --> SAVE[Persist Memory]
+    SAVE --> SQ{Long Memory Enabled}
+    SQ -->|Yes| SB[Save Session And Long DB]
+    SQ -->|No| SS[Save Session Only]
+    SB --> OUT
+    SS --> OUT
+      </div>
+      <div class="small">굵은 소문자 노드(<code>planner</code>, <code>tools</code>, <code>judge</code> 등)가 실제 LangGraph <code>StateGraph</code> 노드 이름입니다.</div>
+    </section>
+
+    <section class="card">
+      <h2>2-1) 코드로 생성된 워크플로우 (get_graph().draw_mermaid())</h2>
+      <div class="small" style="margin-bottom:8px">
+        아래 다이어그램은 컴파일된 그래프에서 <code>app.get_graph().draw_mermaid()</code>로 직접 출력한 결과입니다(과제 요구사항 충족).
+      </div>
+      <div class="mermaid">
+graph TD;
+ __start__([__start__]):::first
+ security(security)
+ context_load(context_load)
+ planner(planner)
+ memory(memory)
+ slots(slots)
+ tools(tools)
+ responder(responder)
+ judge(judge)
+ retry_prep(retry_prep)
+ finalize_blocked(finalize_blocked)
+ finalize_memory(finalize_memory)
+ finalize_answer(finalize_answer)
+ __end__([__end__]):::last
+ __start__ --> security;
+ context_load --> planner;
+ judge -. finalize .-> finalize_answer;
+ judge -. retry .-> retry_prep;
+ memory -. handled .-> finalize_memory;
+ memory -. continue .-> slots;
+ planner --> memory;
+ responder --> judge;
+ retry_prep --> tools;
+ security -. continue .-> context_load;
+ security -. blocked .-> finalize_blocked;
+ slots --> tools;
+ tools --> responder;
+ finalize_answer --> __end__;
+ finalize_blocked --> __end__;
+ finalize_memory --> __end__;
+ classDef default fill:#f2f0ff,line-height:1.2
+ classDef first fill-opacity:0
+ classDef last fill:#bfb6fc
+      </div>
+      <div class="small">생성 명령: <code>python -c "from agent3.graph import build_graph; print(build_graph().get_graph().draw_mermaid())"</code></div>
+    </section>
+
+    <section class="card">
+      <h2>3) LangGraph StateGraph 구조</h2>
+      <h3>노드 (12개)</h3>
+      <div>
+        <span class="pill">security</span><span class="pill">context_load</span><span class="pill">planner</span>
+        <span class="pill">memory</span><span class="pill">slots</span><span class="pill">tools</span>
+        <span class="pill">responder</span><span class="pill">judge</span><span class="pill">retry_prep</span>
+        <span class="pill">finalize_blocked</span><span class="pill">finalize_memory</span><span class="pill">finalize_answer</span>
+      </div>
+      <h3>조건부 분기 (conditional edges) 3곳</h3>
+      <table>
+        <thead><tr><th>분기 노드</th><th>조건</th><th>이동</th></tr></thead>
+        <tbody>
+          <tr><td>security</td><td>민감정보/과다입력 감지</td><td>차단 → finalize_blocked / 통과 → context_load</td></tr>
+          <tr><td>memory</td><td>메모리 명령 처리 완료 여부</td><td>처리됨 → finalize_memory / 통과 → slots</td></tr>
+          <tr><td>judge</td><td>재시도 필요 & 상한(1회) 이내</td><td>retry → retry_prep → tools / 그 외 → finalize_answer</td></tr>
+        </tbody>
+      </table>
+      <h3>반복 루프</h3>
+      <div><code>judge → retry_prep → tools</code> (최대 1회, 무한 루프 방지)</div>
+    </section>
+
+    <section class="card">
+      <h2>4) 단계별 내부 동작 & LLM 개입</h2>
+      <table>
+        <thead><tr><th>단계(노드)</th><th>역할</th><th>LLM</th></tr></thead>
+        <tbody>
+          <tr><td><b>security</b></td><td>민감정보(주민번호/카드/전화/여권), 입력 길이 검사</td><td>규칙 기반 (미들웨어)</td></tr>
+          <tr><td><b>context_load</b></td><td>단기 대화창 + 장기 프로필/요약/최근대화 로드</td><td>없음</td></tr>
+          <tr><td><b>planner</b></td><td>의도 분석, 메모리명령 판단, 툴 계획, 슬롯 추출</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
+          <tr><td><b>memory</b></td><td>장기기억 ON/OFF·수정·삭제 FSM (동의/취소 확인)</td><td>규칙 기반 (미들웨어)</td></tr>
+          <tr><td><b>slots</b></td><td>지역/나이/소득/결혼/분야 표준값 정규화</td><td>없음 (맵핑 테이블)</td></tr>
+          <tr><td><b>tools</b></td><td>정책RAG·컨텐츠RAG·웹검색·파일파싱 오케스트레이션</td><td>없음 (검색·평가)</td></tr>
+          <tr><td><b>responder</b></td><td>툴 결과 + 맥락으로 최종 답변 초안 작성</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
+          <tr><td><b>judge</b></td><td>질문-근거-답변 정합성 평가, 재시도/되물음 결정</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
+        </tbody>
+      </table>
+      <div class="small">Planner / Responder / Judge 세 곳에서 <b>사용자가 상단에서 고른 모델</b>이 그대로 실행됩니다.</div>
+    </section>
+
+    <section class="card">
+      <h2>5) 미들웨어 (운영 안정성)</h2>
+      <div><span class="badge ok">보안 필터</span> 주민등록번호·휴대폰·여권·신용카드 패턴 차단</div>
+      <div><span class="badge ok">입력 길이 제한</span> 과도한 길이 요청 차단</div>
+      <div><span class="badge warn">메모리 확인 절차</span> 장기기억 ON/OFF·수정·삭제 시 동의/취소 강제</div>
+      <div><span class="badge ok">예외 처리</span> 툴 실패 시 개별 격리, 스트리밍 에러 이벤트 반환</div>
+    </section>
+
+    <section class="card">
+      <h2>6) Tool / RAG / Memory</h2>
+      <h3>Tool (4종, 오케스트레이션으로 복수 동시 실행 가능)</h3>
+      <div>
+        <span class="pill">rag_policy_search</span>
+        <span class="pill">rag_content_search</span>
+        <span class="pill">web_search</span>
+        <span class="pill">file_parse</span>
+      </div>
+      <h3>RAG</h3>
+      <ul>
+        <li>정책 / 컨텐츠 <b>분리 벡터스토어</b> 운영</li>
+        <li>정책 검색: 하드조건(지역·나이·결혼·소득·분야) 불일치 감점 + 의미 유사도 가점</li>
+        <li>1차 추림 후 Judge LLM이 최종 정합성 평가</li>
+      </ul>
+      <h3>Memory</h3>
+      <ul>
+        <li>단기: 세션 대화창 (in-memory)</li>
+        <li>장기: 유저코드 기반 SQLite (프로필 + 요약 + 최근대화)</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>7) 상세 사용 가이드</h2>
+
+      <h3>기본 사용 순서</h3>
+      <div class="step"><div class="num">1</div><div>서버 실행: <code>python -m agent3.run_server</code> (포트 8002)</div></div>
+      <div class="step"><div class="num">2</div><div>브라우저 접속: <code>http://localhost:8002</code></div></div>
+      <div class="step"><div class="num">3</div><div>상단에서 모델 선택 → 질문 입력 → 전송</div></div>
+      <div class="step"><div class="num">4</div><div>필요 시 📎로 파일 첨부 후 파일 기반 질문</div></div>
+      <div class="step"><div class="num">5</div><div>우측 패널에서 계획·슬롯·툴·메모리 상태 실시간 확인</div></div>
+
+      <h3>장기기억 사용법</h3>
+      <ol>
+        <li>상단 <b>유저코드</b> 입력 (예: <code>user_kim_01</code>)</li>
+        <li>"장기기억 켜줘" 또는 "내 프로필 저장할게"로 요청</li>
+        <li>시스템이 확인을 물으면 <b>"동의"</b> 또는 <b>"확인"</b>으로 확정 (취소하려면 "취소")</li>
+        <li>나이·지역·소득·결혼여부·관심분야를 자연어로 알려 프로필 갱신</li>
+        <li>"내 저장 프로필 보여줘"로 조회, "장기기억 꺼줘"로 비활성화</li>
+      </ol>
+
+      <h3>유저코드 규칙</h3>
+      <ul>
+        <li>유저코드는 장기기억 식별자입니다. 같은 코드 = 같은 프로필·이력 연결</li>
+        <li>다른 코드를 쓰면 완전히 독립된 메모리 공간</li>
+        <li>유저코드를 비우면 장기기억 없이 단기 대화만 유지</li>
+      </ul>
+
+      <h3>프로필 저장 방식</h3>
+      <ul>
+        <li>장기기억이 ON일 때만 프로필/대화가 SQLite에 저장됩니다</li>
+        <li>슬롯(지역·나이·소득·결혼·주거·분야) 단위로 표준화되어 보관</li>
+        <li>다음 대화에서 자동으로 컨텍스트에 주입되어 맞춤 추천에 반영</li>
+      </ul>
+
+      <h3>모델 선택 가이드</h3>
+      <ul>
+        <li>정확한 구조화·추론 중심: 고성능 모델</li>
+        <li>빠른 응답·저비용 중심: 경량 모델</li>
+        <li>선택 모델은 Planner·Responder·Judge 3단계에 반영</li>
+      </ul>
+
+      <h3>질문 방식 & 추천</h3>
+      <ul>
+        <li>맞춤 추천: "서울 거주, 27세, 미혼, 중위소득 100%, 취업 분야 정책 추천"</li>
+        <li>컨텐츠 탐색: "청년 대상 모집 공고나 최신 소식 알려줘"</li>
+        <li>최신성 강화: "최근 마감 임박 정책 위주로 알려줘"</li>
+        <li>파일 기반: 파일 첨부 후 "이 파일 조건에 맞는 정책만 추천해줘"</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>청년정책 에이전트 v3</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171d2b; --panel2: #1e2636; --line: #2a3346;
+    --text: #e6ebf5; --muted: #8a94a8; --accent: #4f8cff; --ok: #3ddc84;
+    --warn: #ffcc55; --err: #ff6b6b; --chip: #263149;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Segoe UI", "Malgun Gothic", sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+  .app { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: 1fr auto;
+    height: 100vh; gap: 1px; background: var(--line); }
+  header { grid-column: 1 / 3; background: var(--panel); padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .spacer { flex: 1; }
+  header input, header select { background: var(--panel2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12px; }
+
+  .chat { background: var(--bg); display: flex; flex-direction: column; min-height: 0; }
+  .messages { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 78%; padding: 11px 14px; border-radius: 12px; font-size: 14px;
+    line-height: 1.55; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--panel2); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+  .composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); background: var(--panel); }
+  .composer textarea { flex: 1; resize: none; height: 44px; background: var(--panel2);
+    color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 11px; font-size: 14px; font-family: inherit; }
+  .composer button { background: var(--accent); color: #fff; border: 0; border-radius: 10px;
+    padding: 0 20px; font-size: 14px; cursor: pointer; font-weight: 600; }
+  .composer button:disabled { opacity: .5; cursor: default; }
+
+  .side { background: var(--panel); overflow-y: auto; padding: 14px; }
+  .side h2 { font-size: 12px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .5px; margin: 16px 0 8px; }
+  .side h2:first-child { margin-top: 0; }
+  .status { display: flex; align-items: center; gap: 8px; font-size: 13px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .dot.run { background: var(--warn); animation: pulse 1s infinite; }
+  .dot.done { background: var(--ok); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .kv { font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--chip); border: 1px solid var(--line); border-radius: 20px;
+    padding: 3px 10px; font-size: 11px; }
+  .chip.ok { border-color: var(--ok); color: var(--ok); }
+  .chip.warn { border-color: var(--warn); color: var(--warn); }
+  .tool-row { display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; padding: 7px 10px; background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 8px; margin-bottom: 6px; }
+  .muted { color: var(--muted); font-size: 12px; }
+
+  .graph { grid-column: 1 / 3; background: var(--panel); border-top: 1px solid var(--line);
+    padding: 12px 16px; }
+  .graph-title { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; letter-spacing: .5px; }
+  .nodes { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .node { display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 11px; min-width: 74px; opacity: .4; transition: all .2s; }
+  .node.active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .node .nm { font-size: 12px; font-weight: 600; }
+  .node .ms { font-size: 10px; color: var(--muted); }
+  .node.active .ms { color: var(--ok); }
+  .node.running { opacity: 1; border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn) inset; }
+  .node.running .ms { color: var(--warn); }
+  .arrow { color: var(--muted); font-size: 14px; }
+
+  /* 정책 카드 + 페이지네이션 */
+  .policies { margin-top: 10px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  .pcard { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 8px; }
+  .pcard .pt { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .pcard .pmeta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pcard .pbody { font-size: 12px; color: var(--muted); line-height: 1.5; max-height: 0;
+    overflow: hidden; transition: max-height .2s; }
+  .pcard.open .pbody { max-height: 400px; margin-top: 6px; }
+  .pcard .more { font-size: 11px; color: var(--accent); cursor: pointer; }
+  .pcard a { color: var(--accent); font-size: 11px; }
+  .pager { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .pager button { background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; }
+  .pager button:disabled { opacity: .4; cursor: default; }
+  .dots::after { content: ""; animation: dots 1.2s steps(4, end) infinite; }
+  @keyframes dots { 0%{content:"";} 25%{content:".";} 50%{content:"..";} 75%{content:"...";} }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🏛️ 청년정책 에이전트 v3</h1>
+    <span class="muted" id="pipeline-mode">LangGraph 모드</span>
+    <div class="spacer"></div>
+    <a href="/static/agent3_report.html" target="_blank" title="LangGraph 보고서 열기"
+       style="padding:6px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;text-decoration:none;color:inherit;white-space:nowrap">📊 보고서</a>
+    <input id="userCode" placeholder="유저코드(장기기억)" style="width:150px" />
+    <select id="model"></select>
+  </header>
+
+  <!-- 채팅 -->
+  <div class="chat">
+    <div class="messages" id="messages">
+      <div class="msg bot">안녕하세요! 청년정책을 찾아드리는 에이전트예요.
+예: "서울 27살인데 창업 지원 정책 알려줘"</div>
+    </div>
+    <div class="composer">
+      <input type="file" id="file" style="display:none" accept=".pdf,.png,.jpg,.jpeg,.txt" />
+      <button id="attach" title="파일 첨부" style="padding:0 12px;background:var(--panel2);border:1px solid var(--line)">📎</button>
+      <textarea id="input" placeholder="메시지를 입력하세요... (Enter 전송, Shift+Enter 줄바꿈)"></textarea>
+      <button id="send">전송</button>
+    </div>
+    <div id="attachInfo" class="muted" style="padding:0 12px 8px;display:none"></div>
+  </div>
+
+  <!-- 사이드 상태/설명 -->
+  <aside class="side">
+    <h2>현재 상태</h2>
+    <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">대기 중</span></div>
+
+    <h2>계획 (Planner)</h2>
+    <div id="planBox" class="muted">아직 없음</div>
+
+    <h2>추출 슬롯</h2>
+    <div id="slotBox" class="kv"><span class="muted">아직 없음</span></div>
+
+    <h2>실행 툴</h2>
+    <div id="toolBox"><span class="muted">아직 없음</span></div>
+
+    <h2>메모리 / 판정</h2>
+    <div id="metaBox" class="muted">아직 없음</div>
+
+    <h2>장기기억 저장내용</h2>
+    <div id="memBox" class="muted">장기기억 OFF</div>
+  </aside>
+
+  <!-- 하단 노드 그래프 -->
+  <div class="graph">
+    <div class="graph-title">파이프라인 노드 경로 · 노드별 소요시간</div>
+    <div class="nodes" id="nodes"></div>
+  </div>
+</div>
+
+<script>
+const NODE_LABELS = {
+  security: "보안", context_load: "컨텍스트", planner: "계획", memory: "메모리",
+  slots: "슬롯", tools: "툴", responder: "응답", judge: "판정",
+  retry_prep: "재시도준비", finalize_blocked: "차단종료",
+  finalize_memory: "메모리종료", finalize_answer: "응답확정",
+};
+const TOOL_LABELS = {
+  rag_policy_search: "정책 RAG", rag_content_search: "컨텐츠 RAG",
+  web_search: "웹검색", file_parse: "파일파싱",
+};
+const EMP = {job_seeking:"취업준비", employed:"재직", unemployed:"실업", student:"학생"};
+const MAR = {single:"미혼", married:"기혼", newly_married:"신혼"};
+const HOU = {no_house:"무주택", home_owner:"자가"};
+let NODES = Object.keys(NODE_LABELS);
+const liveTimings = {}; const liveTrace = new Set();
+let attachment = null;
+
+const userId = localStorage.getItem("agent2_uid") || ("u-" + Math.random().toString(36).slice(2, 10));
+localStorage.setItem("agent2_uid", userId);
+const el = (id) => document.getElementById(id);
+
+async function loadModels() {
+  try {
+    const r = await fetch("/api/models"); const d = await r.json();
+    const sel = el("model");
+    d.models.forEach(m => {
+      const o = document.createElement("option");
+      o.value = JSON.stringify({provider: m.provider, model: m.model});
+      o.textContent = m.label + (m.available ? "" : " (키없음)");
+      if (!m.available) o.disabled = true;
+      sel.appendChild(o);
+    });
+  } catch (e) {}
+}
+async function loadGraph() {
+  try { const r = await fetch("/api/graph"); const d = await r.json(); if (d.nodes) NODES = d.nodes; }
+  catch (e) {}
+  renderNodes();
+}
+
+function renderNodes(runningNode) {
+  const box = el("nodes"); box.innerHTML = "";
+  NODES.forEach((n, i) => {
+    const active = liveTrace.has(n);
+    const running = n === runningNode;
+    const ms = liveTimings[n];
+    const node = document.createElement("div");
+    node.className = "node" + (running ? " running" : active ? " active" : "");
+    node.innerHTML = `<span class="nm">${NODE_LABELS[n]||n}</span>
+      <span class="ms">${running ? "실행중" : (active && ms!=null ? ms.toFixed(0)+"ms" : "-")}</span>`;
+    box.appendChild(node);
+    if (i < NODES.length - 1) {
+      const a = document.createElement("span"); a.className = "arrow"; a.textContent = "›"; box.appendChild(a);
+    }
+  });
+}
+
+function setStatus(state, text, spinning) {
+  el("statusDot").className = "dot" + (state ? " " + state : "");
+  el("statusText").innerHTML = text + (spinning ? '<span class="dots"></span>' : "");
+}
+
+function addMsg(text, who) {
+  const m = document.createElement("div");
+  m.className = "msg " + who; m.textContent = text;
+  el("messages").appendChild(m);
+  el("messages").scrollTop = el("messages").scrollHeight;
+  return m;
+}
+
+function renderPolicies(container, policies) {
+  if (!policies || !policies.length) return;
+  const wrap = document.createElement("div"); wrap.className = "policies";
+  const title = document.createElement("div");
+  title.className = "muted"; title.style.marginBottom = "6px";
+  title.textContent = `정책 결과 ${policies.length}개`;
+  wrap.appendChild(title);
+  const list = document.createElement("div"); wrap.appendChild(list);
+  const pager = document.createElement("div"); pager.className = "pager"; wrap.appendChild(pager);
+
+  const PER = 5; let page = 0;
+  const pages = Math.ceil(policies.length / PER);
+
+  function draw() {
+    list.innerHTML = "";
+    policies.slice(page*PER, page*PER+PER).forEach(p => {
+      const c = document.createElement("div"); c.className = "pcard";
+      c.innerHTML =
+        `<div class="pt">${p.title||"제목 없음"}</div>
+         <div class="pmeta">
+           ${p.field?`<span class="chip">${p.field}</span>`:""}
+           ${p.region?`<span class="chip">${p.region}</span>`:""}
+           <span class="chip">점수 ${(p.score||0).toFixed(2)}</span>
+         </div>
+         <span class="more">상세 보기 ▾</span>
+         <div class="pbody">${(p.content||"").replace(/</g,"&lt;")}
+           ${p.url?`<div style="margin-top:6px"><a href="${p.url}" target="_blank">신청/상세 링크 ↗</a></div>`:""}
+         </div>`;
+      const more = c.querySelector(".more");
+      more.addEventListener("click", () => {
+        c.classList.toggle("open");
+        more.textContent = c.classList.contains("open") ? "접기 ▴" : "상세 보기 ▾";
+      });
+      list.appendChild(c);
+    });
+    pager.innerHTML = "";
+    const prev = document.createElement("button"); prev.textContent = "‹ 이전";
+    prev.disabled = page===0; prev.onclick = () => { page--; draw(); };
+    const info = document.createElement("span"); info.className = "muted";
+    info.textContent = `${page+1} / ${pages}`;
+    const next = document.createElement("button"); next.textContent = "다음 ›";
+    next.disabled = page>=pages-1; next.onclick = () => { page++; draw(); };
+    pager.append(prev, info, next);
+  }
+  draw();
+  container.appendChild(wrap);
+  el("messages").scrollTop = el("messages").scrollHeight;
+}
+
+function renderPanels(d) {
+  const p = d.plan || {};
+  el("planBox").innerHTML =
+    `<div class="kv">
+       <span class="chip">의도: ${p.intent||"-"}</span>
+       <span class="chip">계획툴: ${(p.tools||[]).map(t=>TOOL_LABELS[t]||t).join(", ")||"없음"}</span>
+       ${p.memory_action && p.memory_action!=="none" ? `<span class="chip warn">메모리: ${p.memory_action}</span>`:""}
+       ${p.needs_user_profile ? `<span class="chip">개인화</span>`:""}
+       ${(p.missing_slots||[]).length ? `<span class="chip warn">부족: ${p.missing_slots.join(", ")}</span>`:""}
+     </div>
+     ${(p.domain_keywords||[]).length ? `<div class="muted" style="margin-top:6px">의미확장: ${p.domain_keywords.join(", ")}</div>`:""}`;
+
+  const s = d.slots || {}; const parts = [];
+  const sl = {region:"지역", age:"나이", income:"소득", employment_status:"고용", marriage_status:"결혼", housing_status:"주거"};
+  Object.keys(sl).forEach(k => {
+    let v = s[k]; if (v==null||v==="") return;
+    if (k==="employment_status") v = EMP[v]||v;
+    if (k==="marriage_status") v = MAR[v]||v;
+    if (k==="housing_status") v = HOU[v]||v;
+    parts.push(`<span class="chip">${sl[k]}: ${v}</span>`);
+  });
+  el("slotBox").innerHTML = parts.length ? parts.join("") : `<span class="muted">추출된 조건 없음</span>`;
+
+  const exec = d.executed_tools || [];
+  el("toolBox").innerHTML = exec.length
+    ? exec.map(t => `<div class="tool-row"><span>${TOOL_LABELS[t]||t}</span><span class="chip ok">완료</span></div>`).join("")
+      + (d.clarify_domain ? `<div class="tool-row"><span>분야 되물음</span><span class="chip warn">clarify</span></div>`:"")
+    : (d.clarify_domain ? `<div class="tool-row"><span>분야 되물음</span><span class="chip warn">clarify</span></div>` : `<span class="muted">툴 미사용 (직접 응답)</span>`);
+
+  const m = d.memory || {};
+  el("metaBox").innerHTML =
+    `<div class="kv">
+       <span class="chip ${m.enabled?"ok":""}">장기기억: ${m.enabled?"ON":"OFF"}</span>
+       ${m.handled ? `<span class="chip warn">메모리처리: ${m.status||m.action}</span>`:""}
+       <span class="chip">판정: ${d.judge||"-"}</span>
+       ${d.retry_count ? `<span class="chip warn">재시도: ${d.retry_count}</span>`:""}
+     </div>`;
+
+  renderMemory(m);
+}
+
+function renderMemory(m) {
+  if (!m || !m.enabled) { el("memBox").innerHTML = '<span class="muted">장기기억 OFF</span>'; return; }
+  const prof = m.profile || {}; const pk = Object.keys(prof);
+  const profChips = pk.length ? pk.map(k => {
+    let v = prof[k];
+    if (k==="employment_status") v = EMP[v]||v;
+    if (k==="marriage_status") v = MAR[v]||v;
+    if (k==="housing_status") v = HOU[v]||v;
+    const ko = {age:"나이",region:"지역",income:"소득",employment_status:"고용",marriage_status:"결혼",children_count:"자녀",housing_status:"주거"}[k]||k;
+    return `<span class="chip">${ko}: ${v}</span>`;
+  }).join("") : '<span class="muted">저장된 프로필 없음</span>';
+  el("memBox").innerHTML =
+    `<div class="kv" style="margin-bottom:8px">${profChips}</div>
+     ${m.summary ? `<div class="muted" style="white-space:pre-wrap;margin-bottom:8px">${m.summary.replace(/</g,"&lt;")}</div>`:""}
+     <div class="muted">저장된 대화 ${m.recent_count||0}건</div>`;
+}
+
+async function uploadFile(file) {
+  const fd = new FormData(); fd.append("file", file);
+  setStatus("run", "파일 업로드 중", true);
+  try {
+    const r = await fetch("/api/upload", { method: "POST", body: fd });
+    const d = await r.json();
+    attachment = { path: d.file_path, type: d.file_type, name: d.file_name };
+    el("attachInfo").style.display = "block";
+    el("attachInfo").textContent = `📎 첨부됨: ${d.file_name} (${d.file_type})`;
+    setStatus("done", "파일 준비됨");
+  } catch (e) { setStatus("", "업로드 실패"); }
+}
+
+async function send() {
+  const input = el("input"); const text = input.value.trim();
+  if (!text && !attachment) return;
+  input.value = ""; el("send").disabled = true;
+  addMsg(text || "(파일 분석 요청)", "user");
+
+  liveTrace.clear(); Object.keys(liveTimings).forEach(k => delete liveTimings[k]);
+  renderNodes();
+  setStatus("run", "계획 중", true);
+
+  let modelSel = {};
+  try { modelSel = JSON.parse(el("model").value || "{}"); } catch (e) {}
+  const botMsg = addMsg("", "bot"); botMsg.innerHTML = '<span class="dots">생각 중</span>';
+
+  const body = {
+    user_id: userId, query: text || "첨부한 파일을 분석해줘",
+    user_code: el("userCode").value.trim() || null,
+    provider: modelSel.provider || null, model_name: modelSel.model || null,
+    file_path: attachment ? attachment.path : null,
+    file_type: attachment ? attachment.type : null,
+  };
+
+  try {
+    const r = await fetch("/api/chat/stream", {
+      method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+    });
+    const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    let finalData = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const chunks = buf.split("\n\n"); buf = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.replace(/^data:\s*/, "").trim();
+        if (!line) continue;
+        let ev; try { ev = JSON.parse(line); } catch (e) { continue; }
+        handleEvent(ev, botMsg);
+        if (ev.type === "final") finalData = ev.result;
+      }
+    }
+
+    if (finalData) {
+      botMsg.textContent = finalData.response || "(응답 없음)";
+      renderPolicies(botMsg, finalData.policies);
+      renderPanels(finalData);
+      renderNodes();
+      setStatus("done", "완료");
+    }
+  } catch (e) {
+    botMsg.textContent = "오류가 발생했어요: " + e;
+    setStatus("", "오류");
+  } finally {
+    el("send").disabled = false;
+    attachment = null; el("attachInfo").style.display = "none";
+  }
+}
+
+function handleEvent(ev, botMsg) {
+  if (ev.type !== "progress") return;
+  const stage = ev.stage;
+  if (stage === "tool") {
+    const label = TOOL_LABELS[ev.tool] || ev.tool;
+    if (ev.phase === "start") setStatus("run", `${label} 실행 중`, true);
+    else setStatus("run", `${label} ${ev.status==="error"?"실패":"완료"}`, true);
+    return;
+  }
+  if (ev.phase === "start") {
+    liveTrace.add(stage);
+    setStatus("run", `${NODE_LABELS[stage]||stage} 단계`, true);
+    renderNodes(stage);
+  } else if (ev.phase === "end") {
+    liveTimings[stage] = ev.elapsed_ms;
+    renderNodes();
+  }
+}
+
+el("send").addEventListener("click", send);
+el("input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+});
+el("attach").addEventListener("click", () => el("file").click());
+el("file").addEventListener("change", (e) => { if (e.target.files[0]) uploadFile(e.target.files[0]); });
+loadModels(); loadGraph();
+</script>
+</body>
+</html>
