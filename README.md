@@ -204,6 +204,14 @@ python -m agent3.run_server
   - 채팅 화면 우상단 **📊 보고서** 버튼으로도 이동 가능
   - 실제 사용 방법은 보고서의 **## 7) 상세 사용 가이드**를 보고 사용해 주세요.
 
+### 3-1) UI 사용 설명 (상단 선택 항목)
+- 상단 **유저코드** 입력창에서 식별 코드를 선택/입력할 수 있습니다.
+  - 같은 유저코드: 같은 장기기억 프로필/대화 이력이 연결됩니다.
+  - 다른 유저코드: 독립된 메모리 공간으로 분리됩니다.
+- 상단 **모델 선택** 드롭다운에서 응답 모델을 선택할 수 있습니다.
+  - 선택 모델 적용: Planner / Responder
+  - 기본 설정 모델(`.env`의 `LLM_PROVIDER`, `LLM_MODEL_NAME`) 적용: Judge
+
 ### 4) 의존성 점검 결과
 - `pip install -r requirements.txt` 후 핵심 엔트리포인트(`agent3.api.app`, `agent3.graph.build_graph`) 임포트/컴파일 확인 완료
 - 스모크 테스트(`python -m agent3._smoke_test`) 실행 확인
