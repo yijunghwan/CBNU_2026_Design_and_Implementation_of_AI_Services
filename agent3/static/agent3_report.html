@@ -95,7 +95,7 @@ flowchart TD
     FM --> OUT
 
     MEMQ -->|No| SLOT[slots Normalize]
-    SLOT --> PSEL[Plan With Selected Model]
+    SLOT --> PSEL[Plan With Default Model]
     PSEL --> TOOLS[tools Orchestration]
 
     TOOLS --> TP[rag_policy_search]
@@ -104,13 +104,13 @@ flowchart TD
     TOOLS --> TF[file_parse]
     TOOLS --> TMULTI[Multi Tool Composition]
 
-    TP --> RESP[responder Selected Model]
+    TP --> RESP[responder User Selected Model]
     TC --> RESP
     TW --> RESP
     TF --> RESP
     TMULTI --> RESP
 
-    RESP --> JUDGE[judge LLM Evaluate]
+    RESP --> JUDGE[judge LLM Evaluate Default Model]
     JUDGE --> RQ{Need Retry}
     RQ -->|Yes Max One| RP[retry_prep]
     RP --> TOOLS
@@ -129,7 +129,7 @@ flowchart TD
     <section class="card">
       <h2>2-1) 코드로 생성된 워크플로우 (get_graph().draw_mermaid())</h2>
       <div class="small" style="margin-bottom:8px">
-        아래 다이어그램은 컴파일된 그래프에서 <code>app.get_graph().draw_mermaid()</code>로 직접 출력한 결과입니다(과제 요구사항 충족).
+        아래 다이어그램은 컴파일된 그래프에서 <code>build_graph().get_graph().draw_mermaid()</code>로 직접 출력한 결과입니다(과제 요구사항 충족).
       </div>
       <div class="mermaid">
 graph TD;
@@ -199,15 +199,15 @@ graph TD;
         <tbody>
           <tr><td><b>security</b></td><td>민감정보(주민번호/카드/전화/여권), 입력 길이 검사</td><td>규칙 기반 (미들웨어)</td></tr>
           <tr><td><b>context_load</b></td><td>단기 대화창 + 장기 프로필/요약/최근대화 로드</td><td>없음</td></tr>
-          <tr><td><b>planner</b></td><td>의도 분석, 메모리명령 판단, 툴 계획, 슬롯 추출</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
+          <tr><td><b>planner</b></td><td>의도 분석, 메모리명령 판단, 툴 계획, 슬롯 추출</td><td><span class="badge llm">LLM</span> 기본 모델(settings)</td></tr>
           <tr><td><b>memory</b></td><td>장기기억 ON/OFF·수정·삭제 FSM (동의/취소 확인)</td><td>규칙 기반 (미들웨어)</td></tr>
           <tr><td><b>slots</b></td><td>지역/나이/소득/결혼/분야 표준값 정규화</td><td>없음 (맵핑 테이블)</td></tr>
           <tr><td><b>tools</b></td><td>정책RAG·컨텐츠RAG·웹검색·파일파싱 오케스트레이션</td><td>없음 (검색·평가)</td></tr>
           <tr><td><b>responder</b></td><td>툴 결과 + 맥락으로 최종 답변 초안 작성</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
-          <tr><td><b>judge</b></td><td>질문-근거-답변 정합성 평가, 재시도/되물음 결정</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
+          <tr><td><b>judge</b></td><td>질문-근거-답변 정합성 평가, 재시도/되물음 결정</td><td><span class="badge llm">LLM</span> 기본 모델(settings)</td></tr>
         </tbody>
       </table>
-      <div class="small">Planner / Responder / Judge 세 곳에서 <b>사용자가 상단에서 고른 모델</b>이 그대로 실행됩니다.</div>
+      <div class="small">사용자 선택 모델은 주로 <b>Responder</b>에 적용되고, <b>Planner/Judge</b>는 기본 설정 모델로 실행됩니다.</div>
     </section>
 
     <section class="card">
@@ -300,7 +300,7 @@ graph TD;
       <ul>
         <li>정확한 구조화·추론 중심: 고성능 모델</li>
         <li>빠른 응답·저비용 중심: 경량 모델</li>
-        <li>선택 모델은 Planner·Responder·Judge 3단계에 반영</li>
+        <li>선택 모델은 주로 Responder에 반영되고, Planner/Judge는 기본 설정 모델을 사용</li>
       </ul>
 
       <h3>질문 방식 & 추천</h3>

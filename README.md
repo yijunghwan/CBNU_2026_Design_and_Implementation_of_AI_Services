@@ -5,10 +5,20 @@
 
 ---
 
+## 실제 실행 화면
+
+### 메인 채팅 UI (실행 URL: `http://localhost:8002`)
+![실행 화면 - 메인 UI](agent3/static/screenshots/ui-home.png)
+
+### LangGraph 보고서 화면 (실행 URL: `http://localhost:8002/static/agent3_report.html`)
+![실행 화면 - 보고서](agent3/static/screenshots/ui-report.png)
+
+---
+
 ## 1. 서비스 소개 및 사용 시나리오
 
 ### 서비스 소개
-- 사용자의 자연어 질문을 **작은 Planner LLM**이 분석해 의도·도구 계획·필요 정보를 스스로 결정합니다.
+- 사용자의 자연어 질문을 **Planner LLM(기본 모델)**이 분석해 의도·도구 계획·필요 정보를 스스로 결정합니다.
 - 청년 정책과 컨텐츠(공지/모집/소식)를 **분리된 RAG 인덱스**로 검색하고, 필요 시 웹 검색·파일 파싱을 병행합니다.
 - 대화 이력(세션)과 **유저코드 기반 장기기억**을 반영해 맞춤 추천 품질을 높입니다.
 - 마지막에 **Judge LLM**이 답변 정합성을 평가하고, 필요하면 재검색 루프를 1회 수행합니다.
@@ -155,7 +165,7 @@ graph TD;
 - **예외 처리**: 개별 툴 실패 격리, API 예외 반환, 스트리밍 에러 이벤트
 
 ### OutputParser (구조화 출력)
-- LangChain **`JsonOutputParser`** 를 1차 파서로 사용해 LLM 출력을 구조화 (`agent2/llm/client.py`의 `invoke_json`)
+- LangChain **`JsonOutputParser`** 를 1차 파서로 사용해 LLM 출력을 구조화 (`agent3/llm/client.py`의 `invoke_json`)
 - Planner LLM: 의도/툴계획/슬롯을 **JSON**으로 파싱
 - Judge LLM: `decision/refined_query/clarifying_question`를 **JSON**으로 파싱
 
@@ -179,7 +189,7 @@ pip install -r requirements.txt
 ```
 OPENAI_API_KEY=sk-...
 # 선택
-GOOGLE_API_KEY=...
+GOOGLE_API_KEY=...   # 또는 GEMINI_API_KEY
 ANTHROPIC_API_KEY=...
 TAVILY_API_KEY=...
 ```
