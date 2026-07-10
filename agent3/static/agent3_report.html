@@ -95,7 +95,7 @@ flowchart TD
     FM --> OUT
 
     MEMQ -->|No| SLOT[slots Normalize]
-    SLOT --> PSEL[Plan With Default Model]
+    SLOT --> PSEL[Plan With User Selected Model]
     PSEL --> TOOLS[tools Orchestration]
 
     TOOLS --> TP[rag_policy_search]
@@ -199,7 +199,7 @@ graph TD;
         <tbody>
           <tr><td><b>security</b></td><td>민감정보(주민번호/카드/전화/여권), 입력 길이 검사</td><td>규칙 기반 (미들웨어)</td></tr>
           <tr><td><b>context_load</b></td><td>단기 대화창 + 장기 프로필/요약/최근대화 로드</td><td>없음</td></tr>
-          <tr><td><b>planner</b></td><td>의도 분석, 메모리명령 판단, 툴 계획, 슬롯 추출</td><td><span class="badge llm">LLM</span> 기본 모델(settings)</td></tr>
+          <tr><td><b>planner</b></td><td>의도 분석, 메모리명령 판단, 툴 계획, 슬롯 추출</td><td><span class="badge llm">LLM</span> 선택 모델</td></tr>
           <tr><td><b>memory</b></td><td>장기기억 ON/OFF·수정·삭제 FSM (동의/취소 확인)</td><td>규칙 기반 (미들웨어)</td></tr>
           <tr><td><b>slots</b></td><td>지역/나이/소득/결혼/분야 표준값 정규화</td><td>없음 (맵핑 테이블)</td></tr>
           <tr><td><b>tools</b></td><td>정책RAG·컨텐츠RAG·웹검색·파일파싱 오케스트레이션</td><td>없음 (검색·평가)</td></tr>
@@ -207,7 +207,7 @@ graph TD;
           <tr><td><b>judge</b></td><td>질문-근거-답변 정합성 평가, 재시도/되물음 결정</td><td><span class="badge llm">LLM</span> 기본 모델(settings)</td></tr>
         </tbody>
       </table>
-      <div class="small">사용자 선택 모델은 주로 <b>Responder</b>에 적용되고, <b>Planner/Judge</b>는 기본 설정 모델로 실행됩니다.</div>
+      <div class="small">사용자 선택 모델은 <b>Planner/Responder</b>에 적용되고, <b>Judge</b>는 기본 설정 모델로 실행됩니다.</div>
     </section>
 
     <section class="card">
@@ -230,8 +230,8 @@ graph TD;
       <h3>RAG</h3>
       <ul>
         <li>정책 / 컨텐츠 <b>분리 벡터스토어</b> 운영</li>
-        <li>정책 검색: 하드조건(지역·나이·결혼·소득·분야) 불일치 감점 + 의미 유사도 가점</li>
-        <li>1차 추림 후 Judge LLM이 최종 정합성 평가</li>
+        <li>정책 검색: 질문 시 RAG로 1차 필터링하고, 하드조건(지역·나이·결혼·소득·분야) 불일치 감점 + 의미 유사도 가점으로 후보를 추림</li>
+        <li>1차 추림 후 대화 내용 기반으로 정책명/내용과 응답을 LLM이 비교·평가해 최종 결과를 출력</li>
       </ul>
       <h3>Memory</h3>
       <ul>
@@ -300,7 +300,7 @@ graph TD;
       <ul>
         <li>정확한 구조화·추론 중심: 고성능 모델</li>
         <li>빠른 응답·저비용 중심: 경량 모델</li>
-        <li>선택 모델은 주로 Responder에 반영되고, Planner/Judge는 기본 설정 모델을 사용</li>
+        <li>선택 모델은 Planner/Responder에 반영되고, Judge는 기본 설정 모델을 사용</li>
       </ul>
 
       <h3>질문 방식 & 추천</h3>
@@ -322,6 +322,31 @@ graph TD;
         <li>재시도 루프가 코드와 동일: <code>judge → retry_prep → tools</code> (최대 1회)</li>
       </ul>
       <div class="small">검증 기준 파일: <code>agent3/graph/graph_builder.py</code> 및 보고서의 2-1 다이어그램(코드 출력본)</div>
+    </section>
+
+    <section class="card">
+      <h2>9) 한계점 및 개선 방향</h2>
+
+      <h3>한계점</h3>
+      <ul>
+        <li>장기기억 요약이 현재 규칙 기반이라 LLM 요약 대비 품질이 제한적입니다.</li>
+        <li>RAG 정량 평가셋(Precision@K 등)이 아직 문서화되지 않았습니다.</li>
+        <li>웹 검색은 키(TAVILY) 설정 시에만 동작합니다.</li>
+        <li>데이터(정책/컨텐츠 원천 및 벡터 인덱스)가 동적으로 변경될 때 자동 감지/재색인 동기화 장치가 없어 최신 데이터 반영이 지연될 수 있습니다.</li>
+        <li>한 턴에서 LLM을 계획(Planner) + 답변생성(Responder) + 평가(Judge)로 평균 약 3회 호출합니다(질문 유형에 따라 security/memory 단계에서 조기 종료될 수 있음).</li>
+        <li>Judge 루프가 1회 발생하면 Responder/Judge가 추가 호출되어 최대 5회 LLM 호출이 일어날 수 있습니다.</li>
+        <li>위 구조로 인해 질문 난이도/루프 여부에 따라 토큰 사용량과 비용 편차가 커질 수 있습니다.</li>
+        <li>청년 정책 도메인을 벗어난 일반 대화로 갈수록 응답 품질과 근거 정합성이 눈에 띄게 낮아질 수 있습니다.</li>
+        <li>현재 운영 기준으로 실제 평가(Judge)는 <code>.env</code>의 <code>LLM_PROVIDER</code>/<code>LLM_MODEL_NAME</code>에 명시된 경량 모델(예: <code>gpt-4o-mini</code>)을 사용합니다.</li>
+      </ul>
+
+      <h3>개선 방향</h3>
+      <ul>
+        <li>평가(Judge)는 고성능 생성 모델과 분리해 경량 모델을 별도로 명시해 운용(비용 최적화).</li>
+        <li>평가 단계 전용 provider/model 설정 키를 분리해 운영자가 비용/품질을 독립적으로 튜닝.</li>
+        <li>청년정책 외 대화 의도를 조기 감지하는 도메인 분류/라우팅을 추가해, 비정책 질문은 일반형 답변 모드로 전환.</li>
+        <li>비정책 질의 포함 품질 평가셋을 별도로 구축해(정확성/근거성/일관성) 품질 저하 구간을 지속적으로 보정.</li>
+      </ul>
     </section>
   </div>
 </body>

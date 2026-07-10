@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import logging
 
-from agent3.config import settings
 from agent3.llm import build_context_block, create_llm, invoke_json
 from agent3.pipeline.base import Stage
 from agent3.schemas.pipeline import (
@@ -77,8 +76,8 @@ class PlannerStage(Stage):
         prompt = _PROMPT.format(context=context_block, query=ctx.query)
 
         llm = create_llm(
-            settings.default_provider,
-            settings.default_model,
+            ctx.provider,
+            ctx.model_name,
             temperature=0,
             max_tokens=500,
         )
