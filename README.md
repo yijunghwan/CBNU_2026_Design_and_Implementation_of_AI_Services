@@ -5,20 +5,10 @@
 
 ---
 
-## 실제 실행 화면
-
-### 메인 채팅 UI (실행 URL: `http://localhost:8002`)
-![실행 화면 - 메인 UI](agent3/static/screenshots/ui-home.png)
-
-### LangGraph 보고서 화면 (실행 URL: `http://localhost:8002/static/agent3_report.html`)
-![실행 화면 - 보고서](agent3/static/screenshots/ui-report.png)
-
----
-
 ## 1. 서비스 소개 및 사용 시나리오
 
 ### 서비스 소개
-- 사용자의 자연어 질문을 **Planner LLM(선택 모델)**이 분석해 의도·도구 계획·필요 정보를 스스로 결정합니다.
+- 사용자의 자연어 질문을 **작은 Planner LLM**이 분석해 의도·도구 계획·필요 정보를 스스로 결정합니다.
 - 청년 정책과 컨텐츠(공지/모집/소식)를 **분리된 RAG 인덱스**로 검색하고, 필요 시 웹 검색·파일 파싱을 병행합니다.
 - 대화 이력(세션)과 **유저코드 기반 장기기억**을 반영해 맞춤 추천 품질을 높입니다.
 - 마지막에 **Judge LLM**이 답변 정합성을 평가하고, 필요하면 재검색 루프를 1회 수행합니다.
@@ -143,7 +133,7 @@ graph TD;
 ## 5. 사용된 Tool / RAG / Memory / Middleware
 
 ### Tool (자율 선택, 복수 동시 실행 가능)
-- `rag_policy_search`: 질문 시 정책 전용 RAG로 1차 필터링 후, 대화 맥락을 기준으로 정책명/정책내용을 LLM이 비교·평가해 결과를 출력
+- `rag_policy_search`: 정책 전용 RAG 검색 + 하드조건 감점/유사도 가점 1차 평가
 - `rag_content_search`: 공지/모집/소식 컨텐츠 전용 RAG 검색
 - `web_search`: 최신성·용어 보완용 웹 검색
 - `file_parse`: 업로드 파일(txt/pdf/이미지) 텍스트 추출
@@ -152,7 +142,7 @@ graph TD;
 - 정책/컨텐츠를 **분리 Chroma 인덱스**로 운영
 - 임베딩: `text-embedding-3-small`
 - 정책 검색 시 **하드조건(지역/나이/결혼/소득/분야) 불일치 감점 + 제목/본문 의미 유사도 가점**
-- 1차 추림 후, 대화 내용 기반으로 정책명/내용과 응답을 LLM이 비교·평가해 최종 결과를 정리
+- 1차 추림 후 Judge LLM이 최종 정합성 평가
 
 ### Memory
 - **단기**: 세션 대화창(in-memory)을 컨텍스트에 주입
@@ -165,7 +155,7 @@ graph TD;
 - **예외 처리**: 개별 툴 실패 격리, API 예외 반환, 스트리밍 에러 이벤트
 
 ### OutputParser (구조화 출력)
-- LangChain **`JsonOutputParser`** 를 1차 파서로 사용해 LLM 출력을 구조화 (`agent3/llm/client.py`의 `invoke_json`)
+- LangChain **`JsonOutputParser`** 를 1차 파서로 사용해 LLM 출력을 구조화 (`agent2/llm/client.py`의 `invoke_json`)
 - Planner LLM: 의도/툴계획/슬롯을 **JSON**으로 파싱
 - Judge LLM: `decision/refined_query/clarifying_question`를 **JSON**으로 파싱
 
@@ -189,7 +179,7 @@ pip install -r requirements.txt
 ```
 OPENAI_API_KEY=sk-...
 # 선택
-GOOGLE_API_KEY=...   # 또는 GEMINI_API_KEY
+GOOGLE_API_KEY=...
 ANTHROPIC_API_KEY=...
 TAVILY_API_KEY=...
 ```
@@ -203,14 +193,6 @@ python -m agent3.run_server
 - 동작 보고서(다이어그램): `http://localhost:8002/static/agent3_report.html`
   - 채팅 화면 우상단 **📊 보고서** 버튼으로도 이동 가능
   - 실제 사용 방법은 보고서의 **## 7) 상세 사용 가이드**를 보고 사용해 주세요.
-
-### 3-1) UI 사용 설명 (상단 선택 항목)
-- 상단 **유저코드** 입력창에서 식별 코드를 선택/입력할 수 있습니다.
-  - 같은 유저코드: 같은 장기기억 프로필/대화 이력이 연결됩니다.
-  - 다른 유저코드: 독립된 메모리 공간으로 분리됩니다.
-- 상단 **모델 선택** 드롭다운에서 응답 모델을 선택할 수 있습니다.
-  - 선택 모델 적용: Planner / Responder
-  - 기본 설정 모델(`.env`의 `LLM_PROVIDER`, `LLM_MODEL_NAME`) 적용: Judge
 
 ### 4) 의존성 점검 결과
 - `pip install -r requirements.txt` 후 핵심 엔트리포인트(`agent3.api.app`, `agent3.graph.build_graph`) 임포트/컴파일 확인 완료
@@ -266,16 +248,12 @@ requirements.txt
 - RAG 정량 평가셋(Precision@K 등)이 아직 문서화되지 않았습니다.
 - 웹 검색은 키(TAVILY) 설정 시에만 동작합니다.
 - 데이터(정책/컨텐츠 원천 및 벡터 인덱스)가 동적으로 변경될 때 이를 자동 감지해 재색인/동기화하는 장치가 없어, 인덱스 재빌드 전까지 최신 데이터 반영이 지연될 수 있습니다.
-- 한 턴에서 LLM을 계획(Planner) + 답변생성(Responder) + 평가(Judge)로 기본 3회 호출하며, Judge 루프가 1회 발생하면 최대 5회 호출되어 토큰 사용량/비용이 커질 수 있습니다.
-- 비용 완화 측면에서 평가는 고성능 모델과 분리해 경량 모델을 별도 명시하여 운용하는 전략이 필요합니다.
-- 현재 운영 기준으로 실제 평가(Judge)는 `.env`의 `LLM_PROVIDER`/`LLM_MODEL_NAME`에 명시된 경량 모델(예: `gpt-4o-mini`)을 사용합니다.
 
 ### 개선 방향
 1. 장기기억 요약을 LLM 기반으로 교체
 2. RAG 오프라인 평가셋 구축(Precision@K, NDCG, 조건 일치율)
 3. 미들웨어 확장(레이트리밋, 요청 추적 ID, 감사 로그)
 4. pytest 기반 통합/회귀 테스트 자동화
-5. Judge 전용 경량 모델 설정(예: 평가 단계 전용 provider/model 키)을 분리해, 루프 발생 시 토큰 비용을 안정적으로 제어
 
 ---
 

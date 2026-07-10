@@ -6,7 +6,8 @@
   <title>청년정책 Agent v3 - LangGraph 보고서</title>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+    mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'loose' });
+    window.mermaid = mermaid;
   </script>
   <style>
     :root {
@@ -45,6 +46,21 @@
     code { background: #eef0ff; padding: 2px 6px; border-radius: 6px; font-size: 13px; }
     .small { color: var(--muted); font-size: 13px; }
     .mermaid { overflow-x: auto; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .lang-btn {
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
+      border-radius: 10px; padding: 6px 10px; font-size: 12px; cursor: pointer;
+    }
+    .diagram-ko { display: none; }
+    .diagram-ko-text {
+      border: 1px solid var(--line);
+      background: #f8faff;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 13px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
     .step { display:flex; gap:10px; margin:8px 0; }
     .num { flex:0 0 26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
     a.back { color:#c7d2fe; text-decoration:none; font-size:13px; }
@@ -72,8 +88,12 @@
     </section>
 
     <section class="card">
-      <h2>2) 전체 실행 다이어그램 (입력 → 응답)</h2>
-      <div class="mermaid">
+      <div class="section-head">
+        <h2>2) 전체 실행 다이어그램 (입력 → 응답)</h2>
+        <button id="diagramLangBtn" class="lang-btn" type="button">한국어 버전 보기</button>
+      </div>
+      <div class="small" id="diagramLangHint" style="margin-bottom:8px;">현재 표시: 원본(영문 라벨)</div>
+      <div class="mermaid diagram-en">
 flowchart TD
     U[User Input] --> MW[Middleware Security Check]
     MW --> MWQ{Sensitive Or Too Long}
@@ -123,6 +143,55 @@ flowchart TD
     SB --> OUT
     SS --> OUT
       </div>
+      <div class="mermaid diagram-ko">
+flowchart TD
+    U[사용자 입력] --> MW[보안 미들웨어 검사]
+    MW --> MWQ{민감정보 또는 과다 입력}
+    MWQ --> FB[차단 종료]
+    FB --> OUT[최종 응답]
+    MWQ --> CL[컨텍스트 로드]
+
+    CL --> SW[단기 메모리 윈도우]
+    CL --> LMQ{장기 메모리 활성화 여부}
+    LMQ --> LW[프로필 요약 최근대화 로드]
+    LMQ --> PLAN[계획]
+    LW --> PLAN
+
+    PLAN[planner LLM 의도 분석] --> MEMQ{메모리 명령 여부}
+    MEMQ --> MEM[memory FSM 미들웨어]
+    MEM --> CONFQ{확인 또는 취소}
+    CONFQ --> FM[메모리 종료]
+    FM --> OUT
+
+    MEMQ --> SLOT[slots 정규화]
+    SLOT --> PSEL[사용자 선택 모델로 계획]
+    PSEL --> TOOLS[tools 오케스트레이션]
+
+    TOOLS --> TP[rag_policy_search]
+    TOOLS --> TC[rag_content_search]
+    TOOLS --> TW[web_search]
+    TOOLS --> TF[file_parse]
+    TOOLS --> TMULTI[복수 툴 조합]
+
+    TP --> RESP[responder 사용자 선택 모델]
+    TC --> RESP
+    TW --> RESP
+    TF --> RESP
+    TMULTI --> RESP
+
+    RESP --> JUDGE[judge LLM 기본 모델 평가]
+    JUDGE --> RQ{재시도 필요 여부}
+    RQ --> RP[retry_prep]
+    RP --> TOOLS
+    RQ --> FA[finalize_answer]
+
+    FA --> SAVE[메모리 저장]
+    SAVE --> SQ{장기 메모리 활성화 여부}
+    SQ --> SB[세션 장기DB 저장]
+    SQ --> SS[세션만 저장]
+    SB --> OUT
+    SS --> OUT
+      </div>
       <div class="small">굵은 소문자 노드(<code>planner</code>, <code>tools</code>, <code>judge</code> 등)가 실제 LangGraph <code>StateGraph</code> 노드 이름입니다.</div>
     </section>
 
@@ -131,7 +200,7 @@ flowchart TD
       <div class="small" style="margin-bottom:8px">
         아래 다이어그램은 컴파일된 그래프에서 <code>build_graph().get_graph().draw_mermaid()</code>로 직접 출력한 결과입니다(과제 요구사항 충족).
       </div>
-      <div class="mermaid">
+      <div class="mermaid diagram-en">
 graph TD;
  __start__([__start__]):::first
  security(security)
@@ -167,6 +236,28 @@ graph TD;
  classDef first fill-opacity:0
  classDef last fill:#bfb6fc
       </div>
+  <div class="mermaid diagram-ko">
+flowchart TD
+  S[시작] --> SEC[보안]
+  SEC --> CTX[컨텍스트 로드]
+  SEC --> FBLK[차단 종료]
+  FBLK --> E[종료]
+
+  CTX --> PLAN[계획]
+  PLAN --> MEM[메모리]
+  MEM --> FMEM[메모리 종료]
+  FMEM --> E
+  MEM --> SLOTS[슬롯]
+
+  SLOTS --> TOOLS[툴]
+  TOOLS --> RESP[응답 생성]
+  RESP --> JUDGE[평가]
+
+  JUDGE --> FANS[응답 확정]
+  FANS --> E
+  JUDGE --> RETRY[재시도 준비]
+  RETRY --> TOOLS
+  </div>
       <div class="small">생성 명령: <code>python -c "from agent3.graph import build_graph; print(build_graph().get_graph().draw_mermaid())"</code></div>
     </section>
 
@@ -355,5 +446,48 @@ graph TD;
       </ul>
     </section>
   </div>
+  <script>
+    (function () {
+      const btn = document.getElementById('diagramLangBtn');
+      const hint = document.getElementById('diagramLangHint');
+      if (!btn || !hint) return;
+
+      let ko = false;
+      const renderVisibleMermaid = async (selector) => {
+        if (!window.mermaid || typeof window.mermaid.run !== 'function') return;
+        const targets = Array.from(document.querySelectorAll(selector)).filter((el) => {
+          const style = getComputedStyle(el);
+          return style.display !== 'none' && !el.dataset.rendered;
+        });
+        if (!targets.length) return;
+        await window.mermaid.run({ nodes: targets });
+        targets.forEach((el) => {
+          el.dataset.rendered = '1';
+        });
+      };
+
+      const setLang = async () => {
+        document.querySelectorAll('.diagram-en').forEach((el) => {
+          el.style.display = ko ? 'none' : 'block';
+        });
+        document.querySelectorAll('.diagram-ko').forEach((el) => {
+          el.style.display = ko ? 'block' : 'none';
+        });
+
+        btn.textContent = ko ? '원본(영문) 보기' : '한국어 버전 보기';
+        hint.textContent = ko ? '현재 표시: 한국어 라벨 다이어그램' : '현재 표시: 원본(영문 라벨)';
+
+        await renderVisibleMermaid(ko ? '.diagram-ko.mermaid' : '.diagram-en.mermaid');
+      };
+
+      btn.addEventListener('click', async () => {
+        ko = !ko;
+        await setLang();
+      });
+
+      // Initial render: only visible English diagrams
+      setLang();
+    })();
+  </script>
 </body>
 </html>
